@@ -7,9 +7,8 @@ import plotly.express as px
 
 st.set_page_config(page_title="Go MED SAÚDE", page_icon=":bar_chart:", layout="wide")
 
-from meu_app import * # Importa todas as funções de meu_app.py
+from meu_app import * 
 
-# Função para exibir o cabeçalho com imagem
 def exibir_cabecalho(img_path, titulo):
     if os.path.exists(img_path):
         col1, col2 = st.columns([1, 12])
@@ -25,7 +24,6 @@ exibir_cabecalho("go_med_saude.jpeg", "Sistema de Análise")
 st.write("")
 st.write("")
 
-# Função para obter os caminhos dos arquivos
 def carregar_arquivos(tipo: str):
     caminhos = {
         "vendas": "df_vendas.csv",
@@ -33,7 +31,6 @@ def carregar_arquivos(tipo: str):
     return caminhos.get(tipo, None)
 
 def main():
-    # Barra lateral de navegação
     with st.sidebar:
         menu_selecionado = option_menu(
             menu_title="Navegação",
@@ -63,13 +60,16 @@ def main():
                 if df.empty:
                     st.warning("O arquivo CSV está vazio.")
                 else:
-                    tab1, tab2 = st.tabs(["Visão Geral", "Comparativo de Períodos"])
+                    tab1, tab2, tab3 = st.tabs(["Visão Geral", "Comparativo de Períodos", "Analise de tickets"])
 
                     with tab1:
                         renderizar_pagina_vendas(df)
 
                     with tab2:
                         renderizar_pagina_comparativo(df)
+
+                    with tab3:
+                        renderizar_pagina_vendedor(df)
 
             except Exception as e:
                 st.error(f"Ocorreu um erro ao carregar o arquivo: {e}")
