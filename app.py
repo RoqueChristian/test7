@@ -3,6 +3,8 @@ import pandas as pd
 from streamlit_option_menu import option_menu
 import os
 import plotly.express as px
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 st.set_page_config(page_title="Go MED SAÚDE", page_icon=":bar_chart:", layout="wide")
@@ -31,6 +33,8 @@ def carregar_arquivos(tipo: str):
     return caminhos.get(tipo, None)
 
 def main():
+
+
     with st.sidebar:
         menu_selecionado = option_menu(
             menu_title="Navegação",
@@ -39,7 +43,7 @@ def main():
             menu_icon="cast",
             default_index=0,
             styles={
-                "container": {"padding": "0!important", "background-color": "#fafafa"},
+                "container": {"padding": "0!important", "background-color": "#87CEEB"},
                 "icon": {"color": "orange", "font-size": "25px"},
                 "nav-link": {
                     "font-size": "16px",
