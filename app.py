@@ -43,13 +43,13 @@ def main():
             menu_icon="cast",
             default_index=0,
             styles={
-                "container": {"padding": "0!important", "background-color": "#87CEEB"},
+                "container": {"padding": "0!important", "background-color": "#3b8c88"},
                 "icon": {"color": "orange", "font-size": "25px"},
                 "nav-link": {
                     "font-size": "16px",
                     "text-align": "left",
                     "margin": "0px",
-                    "--hover-color": "#eee",
+                    "--hover-color": "#e7ecd0",
                 },
                 "nav-link-selected": {"background-color": "red"},
             },

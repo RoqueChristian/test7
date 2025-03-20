@@ -45,11 +45,11 @@ def aplicar_filtros(df, vendedor='Todos', mes='Todos', ano='Todos', situacao='Fa
 
 def criar_grafico_barras(df, x, y, title, labels):
     
-    df['Valor_Formatado'] = df[y].apply(formatar_moeda)
+    df['Valor_Monetario'] = df[y].apply(formatar_moeda)
 
     fig = px.bar(df, x=x, y=y, title=title, labels=labels, 
-                 color=y, text_auto=True, template="plotly_white", 
-                 hover_data={x: False, y: False, 'Valor_Formatado': True})  
+                 color=y, text=df['Valor_Monetario'], template="plotly_white", 
+                 hover_data={x: False, y: False, 'Valor_Monetario': True})  
 
     fig.update_traces(marker=dict(line=dict(color='black', width=1)), 
                       hoverlabel=dict(bgcolor="black", font_size=22, 
@@ -66,13 +66,13 @@ def criar_grafico_vendas_diarias(df, mes, ano):
 
     vendas_diarias = df_filtrado.groupby('Dia')['Valor_Total_Item'].sum().reset_index()
 
-    vendas_diarias["Valor_Formatado"] = vendas_diarias["Valor_Total_Item"].apply(formatar_moeda)
+    vendas_diarias["Valor_Monetario"] = vendas_diarias["Valor_Total_Item"].apply(formatar_moeda)
 
     fig = px.bar(vendas_diarias, x='Dia', y='Valor_Total_Item',
                  title=f'Vendas Diárias em {mes}/{ano}',
                  labels={'Dia': 'Dia', 'Valor_Total_Item': 'Valor Total de Venda'},
                  color='Valor_Total_Item', text_auto=True,
-                 template="plotly_white", hover_data={'Valor_Total_Item': False,'Valor_Formatado': True})
+                 template="plotly_white", hover_data={'Valor_Total_Item': False,'Valor_Monetario': True})
 
     fig.update_traces(marker=dict(line=dict(color='black', width=1)),
                       hoverlabel=dict(bgcolor="black", font_size=22,
@@ -154,13 +154,13 @@ def renderizar_pagina_vendas(df):
         def criar_grafico_meses(df):
             df_meses = df.groupby('Mes').agg({'Valor_Total_Item': 'sum'}).reset_index()
             df_meses = df_meses.sort_values(by='Mes') 
-            df_meses["Valor_Formatado"] = df_meses["Valor_Total_Item"].apply(formatar_moeda)
+            df_meses["Valor_Monetario"] = df_meses["Valor_Total_Item"].apply(formatar_moeda)
 
             labels = {'Mes': 'Mês', 'Valor_Total_Item': 'Valor Total de Venda'}
             
             fig = px.bar(df_meses, x='Mes', y='Valor_Total_Item', title='Vendas por Mês', 
-                        labels=labels, color='Valor_Total_Item', text_auto=True, 
-                        template="plotly_white", hover_data={'Valor_Total_Item': False, 'Valor_Formatado': True})
+                        labels=labels, color='Valor_Total_Item', text=df_meses["Valor_Monetario"], 
+                        template="plotly_white", hover_data={'Valor_Total_Item': False, 'Valor_Monetario': True})
 
             fig.update_traces(marker=dict(line=dict(color='black', width=1)),
                                 hoverlabel=dict(bgcolor="black", font_size=22,
@@ -223,7 +223,8 @@ def renderizar_pagina_comparativo(df):
     col1, col2 = st.columns(2)
 
     with col1:
-        periodo1_opcao = st.selectbox("Período 1", ["Personalizado", "Últimos 30 dias", "Mês atual", "Ano anterior"])
+        periodo1_opcao = st.selectbox("Período 1", ["Personalizado", "Últimos 30 dias", "Mês atual", "Ano anterior", "Mês anterior"])
+        
         if periodo1_opcao == "Personalizado":
             data_inicio_1 = st.date_input("Início do Período 1", pd.to_datetime("2024-01-01").date(), format="DD/MM/YYYY")
             data_fim_1 = st.date_input("Fim do Período 1", pd.to_datetime("2024-02-28").date(), format="DD/MM/YYYY")
@@ -236,9 +237,13 @@ def renderizar_pagina_comparativo(df):
         elif periodo1_opcao == "Ano anterior":
             data_fim_1 = (pd.to_datetime("today") - pd.Timedelta(days=365)).date()
             data_inicio_1 = (pd.to_datetime(f"{data_fim_1.year}-01-01")).date()
+        elif periodo1_opcao == "Mês anterior":
+            data_fim_1 = pd.to_datetime("today").replace(day=1) - pd.Timedelta(days=1)  
+            data_inicio_1 = data_fim_1.replace(day=1) 
 
     with col2:
-        periodo2_opcao = st.selectbox("Período 2", ["Personalizado", "Últimos 30 dias", "Mês atual", "Ano anterior", "Comparar com ano anterior"])
+        periodo2_opcao = st.selectbox("Período 2", ["Personalizado", "Últimos 30 dias", "Mês atual", "Ano anterior", "Comparar com ano anterior", "Mês anterior"])
+        
         if periodo2_opcao == "Personalizado":
             data_inicio_2 = st.date_input("Início do Período 2", pd.to_datetime("2024-03-01").date(), format="DD/MM/YYYY")
             data_fim_2 = st.date_input("Fim do Período 2", pd.to_datetime("2024-03-31").date(), format="DD/MM/YYYY")
@@ -254,6 +259,10 @@ def renderizar_pagina_comparativo(df):
         elif periodo2_opcao == "Comparar com ano anterior":
             data_inicio_2 = (pd.to_datetime(data_inicio_1) - pd.Timedelta(days=365)).date()
             data_fim_2 = (pd.to_datetime(data_fim_1) - pd.Timedelta(days=365)).date()
+        elif periodo2_opcao == "Mês anterior":
+            # Mês anterior
+            data_fim_2 = pd.to_datetime("today").replace(day=1) - pd.Timedelta(days=1) 
+            data_inicio_2 = data_fim_2.replace(day=1)  
 
     if st.button("Atualizar"):
         try:
@@ -314,7 +323,6 @@ def renderizar_pagina_comparativo(df):
         vendas_diarias_periodo1 = df_periodo1.groupby('Data')['Valor_Total_Item'].sum().reset_index()
         vendas_diarias_periodo2 = df_periodo2.groupby('Data')['Valor_Total_Item'].sum().reset_index()
 
-        # Adicionando média móvel de 7 dias
         vendas_diarias_periodo1['Média Móvel'] = vendas_diarias_periodo1['Valor_Total_Item'].rolling(window=7, min_periods=1).mean()
         vendas_diarias_periodo2['Média Móvel'] = vendas_diarias_periodo2['Valor_Total_Item'].rolling(window=7, min_periods=1).mean()
 
@@ -327,11 +335,11 @@ def renderizar_pagina_comparativo(df):
                 y='Valor_Total_Item', 
                 title='📊 Tendência Período 1', 
                 labels={'Valor_Total_Item': 'Valor Total de Vendas', 'Data': 'Data'},
-                line_shape="spline",  # Linha suavizada
-                color_discrete_sequence=['#636EFA']  # Azul
+                line_shape="spline",  
+                color_discrete_sequence=['#636EFA'],
+                hover_data={'Data': False, 'Valor_Total_Item': False}
             )
 
-            # Adiciona média móvel ao gráfico
             fig_linha_periodo1.add_scatter(
                 x=vendas_diarias_periodo1['Data'], 
                 y=vendas_diarias_periodo1['Média Móvel'],
@@ -350,7 +358,8 @@ def renderizar_pagina_comparativo(df):
                 title='📊 Tendência Período 2', 
                 labels={'Valor_Total_Item': 'Valor Total de Vendas', 'Data': 'Data'},
                 line_shape="spline",  
-                color_discrete_sequence=['#EF553B']  # Vermelho
+                color_discrete_sequence=['#EF553B'],
+                hover_data={'Data': False, 'Valor_Total_Item': False}
             )
 
             fig_linha_periodo2.add_scatter(
@@ -367,52 +376,52 @@ def renderizar_pagina_comparativo(df):
 
         st.subheader("📅 Análise de Sazonalidade")
 
-        # Mapeamento dos dias da semana para português
         traducao_dias = {
             "Monday": "Segunda", "Tuesday": "Terça", "Wednesday": "Quarta",
             "Thursday": "Quinta", "Friday": "Sexta", "Saturday": "Sábado", "Sunday": "Domingo"
         }
 
-        # Traduzindo os dias e garantindo a ordem correta
         dias_da_semana_ordem = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
 
         for df in [df_periodo1, df_periodo2]:
             df['Dia_da_Semana'] = df['Data_Emissao'].dt.day_name().map(traducao_dias)
             df['Período'] = 'Período 1' if df is df_periodo1 else 'Período 2'
 
-        # Concatenando os dados dos dois períodos
         df_sazonalidade_combinada = pd.concat([
             df_periodo1[['Dia_da_Semana', 'Valor_Total_Item', 'Período']],
             df_periodo2[['Dia_da_Semana', 'Valor_Total_Item', 'Período']]
         ])
 
-        # Definir a ordenação correta dos dias da semana
         df_sazonalidade_combinada['Dia_da_Semana'] = pd.Categorical(
             df_sazonalidade_combinada['Dia_da_Semana'], categories=dias_da_semana_ordem, ordered=True
         )
 
-        # Criando o boxplot
+        df_sazonalidade_combinada['Total Vendido'] = df_sazonalidade_combinada['Valor_Total_Item'].apply(formatar_moeda)
+
         fig_boxplot_combinado = px.box(
             df_sazonalidade_combinada,
             x='Dia_da_Semana',
             y='Valor_Total_Item',
             color='Período',
             title='Comparação da Sazonalidade das Vendas por Dia da Semana',
-            labels={'Valor_Total_Item': 'Valor Total de Vendas', 'Dia_da_Semana': 'Dia da Semana'}
+            labels={'Valor_Total_Item': 'Valor Total de Vendas', 'Dia_da_Semana': 'Dia da Semana'},
+            hover_data={'Dia_da_Semana': False, 'Período': False, 'Valor_Total_Item': False, 'Total Vendido': True}
         )
 
-        # Ajustando o formato dos valores no eixo Y para reais (R$)
         fig_boxplot_combinado.update_yaxes(tickprefix="R$ ", tickformat=",.2f")
-
-        # Garantindo a ordem correta no eixo X
         fig_boxplot_combinado.update_xaxes(categoryorder='array', categoryarray=dias_da_semana_ordem)
-
-        # Melhorando layout do gráfico
         fig_boxplot_combinado.update_layout(
             boxmode='group',
             margin=dict(l=40, r=40, t=60, b=40)
         )
 
+        fig_boxplot_combinado.update_layout(
+            hoverlabel=dict(
+                bgcolor="black",
+                font_size=22,
+                font_family="Arial, sans-serif"
+            )
+        )
         st.plotly_chart(fig_boxplot_combinado, use_container_width=True)
 
 
@@ -474,7 +483,7 @@ def renderizar_pagina_vendedor(df):
             df_pivot = df_ticket_medio.pivot(index='Vendedor', columns='Semana', values='Ticket_Medio')
 
             # Criando uma nova coluna com os valores formatados
-            df_ticket_medio['Ticket_Medio_Formatado'] = df_ticket_medio['Ticket_Medio'].apply(formatar_moeda)
+            df_ticket_medio['Ticket Medio'] = df_ticket_medio['Ticket_Medio'].apply(formatar_moeda)
 
             st.subheader("Ticket Médio por Vendedor e Semana (Tabela)")
 
@@ -520,10 +529,10 @@ def renderizar_pagina_vendedor(df):
                         title='Ticket Médio por Vendedor e Semana',
                         labels={'Ticket_Medio': 'Ticket Médio', 'Semana': 'Semana'},
                         color_continuous_scale=px.colors.sequential.Plasma,
-                        text_auto=True, 
-                        hover_data={'Semana': False, 'Ticket_Medio': False, 'Ticket_Medio_Formatado': True})  # Mostrando valores formatados
+                        text='Ticket Medio',
+                        hover_data={'Semana': False, 'Ticket_Medio': False, 'Ticket Medio': True})  
 
-            # Ajustes do gráfico
+           
             fig.update_traces(marker=dict(line=dict(color='black', width=1)),
                             hoverlabel=dict(bgcolor="black", font_size=22, font_family="Arial_bold, sans-serif"))
 
@@ -541,10 +550,19 @@ def renderizar_pagina_vendedor(df):
                 template="plotly_white"
             )
 
-            # Exibindo o gráfico no Streamlit
+            
             st.plotly_chart(fig)
 
         return df_nf_unicas
 
     df = processar_dados(df)
-    st.dataframe(df, use_container_width=True)
+
+    df_styled = df.style.format({
+        'Data_Emissao': lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) else '',
+        'Valor_Total_Nota': formatar_moeda,
+        'Soma_Venda_Semana': formatar_moeda, 
+        'Quantidade_Notas_Semana': '{:,.0f}'
+    }).applymap(lambda val: 'background-color: #ADD8E6; color: black' if isinstance(val, (int, float)) and val > 10000 else '', subset=['Valor_Total_Nota'])
+
+    
+    st.dataframe(df_styled, use_container_width=True)
