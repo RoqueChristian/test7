@@ -71,7 +71,7 @@ def criar_grafico_vendas_diarias(df, mes, ano):
     fig = px.bar(vendas_diarias, x='Dia', y='Valor_Total_Item',
                  title=f'Vendas Diárias em {mes}/{ano}',
                  labels={'Dia': 'Dia', 'Valor_Total_Item': 'Valor Total de Venda'},
-                 color='Valor_Total_Item', text_auto=True,
+                 color='Valor_Total_Item', text=vendas_diarias["Valor_Monetario"],
                  template="plotly_white", hover_data={'Valor_Total_Item': False,'Valor_Monetario': True})
 
     fig.update_traces(marker=dict(line=dict(color='black', width=1)),
@@ -138,7 +138,7 @@ def renderizar_pagina_vendas(df):
     col2.metric("Total de Produtos", f"{total_qtd_produto}")
     col3.metric("Faturamento Total", formatar_moeda(valor_total_item))
     col4.metric("Custo Total", formatar_moeda(total_custo_compra))
-    col5.metric("Lucro Total", formatar_moeda(total_lucro_venda))
+    col5.metric("Margem Bruta", formatar_moeda(total_lucro_venda))
 
     
 
@@ -431,8 +431,7 @@ def renderizar_pagina_comparativo(df):
 def renderizar_pagina_vendedor(df):
     def processar_dados(df):
         df['Data_Emissao'] = pd.to_datetime(df['Data_Emissao'], format='mixed', dayfirst=True)
-        df['Semana'] = df['Data_Emissao'].dt.isocalendar().week
-        colunas_nf_unicas = ['NF', 'Data_Emissao', 'Vendedor', 'Valor_Total_Nota', 'Mes', 'Ano', 'Semana', 'situacao']
+        colunas_nf_unicas = ['NF', 'Data_Emissao', 'Vendedor', 'Valor_Total_Nota', 'Mes', 'Ano', 'situacao']
         df_nf_unicas = df.drop_duplicates(subset='NF')[colunas_nf_unicas].copy()
         df_nf_unicas = df_nf_unicas[df_nf_unicas['situacao'] == 'Faturada']
 
@@ -464,13 +463,6 @@ def renderizar_pagina_vendedor(df):
 
         df_nf_unicas = aplicar_filtros(df_nf_unicas, mes_selecionado, ano_selecionado)
 
-        df_resumo = df_nf_unicas.groupby(['Ano', 'Mes', 'Semana', 'Vendedor'])['NF'].count().reset_index(name='Quantidade_Notas_Semana')
-        df_nf_unicas = pd.merge(df_nf_unicas, df_resumo, on=['Ano', 'Mes', 'Semana', 'Vendedor'], how='left')
-        df_nf_unicas['Quantidade_Notas_Semana'] = df_nf_unicas['Quantidade_Notas_Semana'].fillna(0).astype(int)
-
-        df_resumo_vendas = df_nf_unicas.groupby(['Ano', 'Mes', 'Semana', 'Vendedor'])['Valor_Total_Nota'].sum().reset_index(name='Soma_Venda_Semana')
-        df_nf_unicas = pd.merge(df_nf_unicas, df_resumo_vendas, on=['Ano', 'Mes', 'Semana', 'Vendedor'], how='left')
-
         total_notas = df_nf_unicas['NF'].nunique()
         faturamento_total = df_nf_unicas['Valor_Total_Nota'].sum()
 
@@ -478,80 +470,43 @@ def renderizar_pagina_vendedor(df):
         col1.metric("Total de Notas", f"{total_notas}")
         col2.metric("Faturamento Total", formatar_moeda(faturamento_total))
 
-        if mes_selecionado != 'Todos':
-            df_ticket_medio = df_nf_unicas.groupby(['Vendedor', 'Semana'])['Valor_Total_Nota'].mean().reset_index(name='Ticket_Medio')
-            df_pivot = df_ticket_medio.pivot(index='Vendedor', columns='Semana', values='Ticket_Medio')
+        # Cálculo do ticket médio por vendedor (sem semana)
+        df_ticket_medio = df_nf_unicas.groupby('Vendedor')['Valor_Total_Nota'].mean().reset_index(name='Ticket_Medio')
+        df_ticket_medio['Ticket Medio'] = df_ticket_medio['Ticket_Medio'].apply(formatar_moeda)
 
-            # Criando uma nova coluna com os valores formatados
-            df_ticket_medio['Ticket Medio'] = df_ticket_medio['Ticket_Medio'].apply(formatar_moeda)
+        st.subheader("Ticket Médio por Vendedor (Tabela)")
+        st.dataframe(df_ticket_medio[['Vendedor', 'Ticket Medio']])
 
-            st.subheader("Ticket Médio por Vendedor e Semana (Tabela)")
+        st.subheader("Ticket Médio por Vendedor (Gráfico de Barras)")
+        fig = px.bar(df_ticket_medio, x='Vendedor', y='Ticket_Medio',
+                    title='Ticket Médio por Vendedor',
+                    labels={'Ticket_Medio': 'Ticket Médio'},
+                    text='Ticket Medio',
+                    hover_data={'Vendedor': False, 'Ticket_Medio': False, 'Ticket Medio': True})
 
+        fig.update_traces(marker=dict(line=dict(color='black', width=1)),
+                        hoverlabel=dict(bgcolor="black", font_size=22, font_family="Arial, sans-serif"),
+                        textfont=dict(size=20, color='#ffffff', family="Arial, sans-serif"), 
+                        textposition='outside',
+                        cliponaxis=False
+                        )
 
-            df_pivot = df_pivot.applymap(formatar_moeda)
-
-            html_table = df_pivot.to_html(classes='data', index=True)
-
-            css = """
-            <style type="text/css">
-            table.data {
-                border-collapse: collapse;
-                width: 100%;
-                background-color: #8FBC8F; /* Verde Médio para o fundo geral */
-                color: #000; /* Cor do texto para contraste no fundo verde */
-            }
-
-            table.data th, table.data td {
-                border: 2px solid black;
-                padding: 8px;
-                text-align: center;
-                background-color: inherit; /* Herda o fundo verde da tabela */
-            }
-
-            table.data th {
-                background-color: #2E8B57; /* Verde Marinho para o cabeçalho */
-                color: #000000; /* Cor do texto branca para contraste no cabeçalho */
-            }
-
-            table.data tr:nth-child(even) {
-                background-color: inherit; /* Herda o fundo verde da tabela */
-            }
-
-            table.data tr {
-                color: #000; /* Cor do texto preta para contraste nas linhas */
-            }
-            </style>
-            """
-            components.html(css + html_table, height=300)
-
-            st.subheader("Ticket Médio por Vendedor e Semana (Gráfico de Barras Agrupadas)")
-            fig = px.bar(df_ticket_medio, x='Semana', y='Ticket_Medio', color='Vendedor', barmode='group',
-                        title='Ticket Médio por Vendedor e Semana',
-                        labels={'Ticket_Medio': 'Ticket Médio', 'Semana': 'Semana'},
-                        color_continuous_scale=px.colors.sequential.Plasma,
-                        text='Ticket Medio',
-                        hover_data={'Semana': False, 'Ticket_Medio': False, 'Ticket Medio': True})  
-
-           
-            fig.update_traces(marker=dict(line=dict(color='black', width=1)),
-                            hoverlabel=dict(bgcolor="black", font_size=22, font_family="Arial_bold, sans-serif"))
-
-            fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-
-            # Definindo a ordem das semanas
-            semanas_unicas = sorted(df_ticket_medio['Semana'].unique())
-            fig.update_layout(
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=semanas_unicas,
-                    ticktext=[str(semana) for semana in semanas_unicas]
+        fig.update_layout(
+            yaxis_title='Ticket Médio',
+            template="plotly_dark", 
+            xaxis=dict(tickfont=dict(size=18), title_font=dict(color='white'), tickcolor='white'),
+            yaxis=dict(
+                title=dict(
+                    text="Ticket Médio",
+                    font=dict(size=18, color='white')
                 ),
-                yaxis_title='Ticket Médio',
-                template="plotly_white"
-            )
-
-            
-            st.plotly_chart(fig)
+                tickfont=dict(size=18, color='white'), 
+                tickcolor='white'
+            ),
+            title_font=dict(size=30, family="Times New Roman", color='white'),
+            font=dict(color='white') 
+        )
+        st.plotly_chart(fig)
 
         return df_nf_unicas
 
@@ -560,9 +515,8 @@ def renderizar_pagina_vendedor(df):
     df_styled = df.style.format({
         'Data_Emissao': lambda x: x.strftime('%d/%m/%Y') if pd.notnull(x) else '',
         'Valor_Total_Nota': formatar_moeda,
-        'Soma_Venda_Semana': formatar_moeda, 
+        'Soma_Venda_Semana': formatar_moeda,
         'Quantidade_Notas_Semana': '{:,.0f}'
     }).applymap(lambda val: 'background-color: #ADD8E6; color: black' if isinstance(val, (int, float)) and val > 10000 else '', subset=['Valor_Total_Nota'])
 
-    
     st.dataframe(df_styled, use_container_width=True)
