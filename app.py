@@ -29,8 +29,8 @@ st.write("")
 
 def carregar_arquivos(tipo: str):
     caminhos = {
-        "vendas": "arquivos/df_vendas.csv",
-        "compras": "arquivos/df_compra.csv",
+        "vendas": "df_vendas.csv",
+        "compras": "df_compra.csv",
     }
     return caminhos.get(tipo, None)
 
