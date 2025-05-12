@@ -2,6 +2,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import streamlit.components.v1 as components
+import plotly.graph_objects as go
+
+
+METAS_VENDEDORES = {
+    "VERIDIANA SERRA": 600000.00,
+    "CESAR GAMA": 450000.00,
+    "FABIAN SILVA": 400000.00,
+    "DENIS SOUSA": 1050000.00,
+    "THIAGO SOUSA": 200000.00
+}
 
 def formatar_moeda(valor, simbolo_moeda="R$"):
     if pd.isna(valor):
@@ -15,7 +25,11 @@ def calcular_metricas(df):
     valor_total_item = df['Valor_Total_Item'].sum()
     total_custo_compra = df['Total_Custo_Compra'].sum()
     total_lucro_venda = df['Total_Lucro_Venda_Item'].sum()
-    return total_nf, total_qtd_produto, valor_total_item, total_custo_compra, total_lucro_venda
+
+    ticket_medio_geral = valor_total_item / total_nf if total_nf > 0 else 0
+    porcentagem_lucro_venda = (total_lucro_venda / valor_total_item) * 100 if valor_total_item > 0 else 0
+
+    return total_nf, total_qtd_produto, valor_total_item, total_custo_compra, total_lucro_venda, ticket_medio_geral, porcentagem_lucro_venda
 
 def agrupar_e_somar(df, coluna_agrupamento):
     return df.groupby(coluna_agrupamento).agg(
@@ -86,6 +100,90 @@ def criar_grafico_vendas_diarias(df, mes, ano):
     return fig
 
 
+def calcular_performance_vendedores(df_vendas):
+    vendas_por_vendedor_filtrado = df_vendas[
+        (df_vendas['Vendedor'] != 'GERAL VENDAS') & (df_vendas['Vendedor'] != 'NATALIA SILVA') & (df_vendas['Vendedor'] != 'JORGE TOTE')
+    ].copy()
+
+    # Realizar o groupby e os cálculos no DataFrame filtrado
+    vendas_por_vendedor = vendas_por_vendedor_filtrado.groupby('Vendedor')['Valor_Total_Item'].sum().reset_index()
+    vendas_por_vendedor = vendas_por_vendedor.rename(columns={'Valor_Total_Item': 'Total_Vendido'})
+
+    vendas_por_vendedor['Meta'] = vendas_por_vendedor['Vendedor'].map(METAS_VENDEDORES).fillna(0)
+    vendas_por_vendedor['Porcentagem_Atingida'] = (vendas_por_vendedor['Total_Vendido'] / vendas_por_vendedor['Meta'] * 100).fillna(0).round(2)
+    vendas_por_vendedor['Meta_Formatada'] = vendas_por_vendedor['Meta'].apply(formatar_moeda)
+    vendas_por_vendedor['Total_Vendido_Formatado'] = vendas_por_vendedor['Total_Vendido'].apply(formatar_moeda)
+    vendas_por_vendedor['Porcentagem_Texto'] = vendas_por_vendedor['Porcentagem_Atingida'].astype(str) + '%'
+
+    return vendas_por_vendedor
+
+def criar_grafico_performance_vendedores(df_performance):
+    fig = go.Figure()
+
+    max_meta = df_performance['Meta'].max()
+    limite_superior_yaxis = max_meta * 1.2
+
+    # Barra de Meta (Background)
+    fig.add_trace(go.Bar(
+        x=df_performance['Vendedor'],
+        y=df_performance['Meta'],
+        name='Meta',
+        marker=dict(color='lightgrey'),
+        text=df_performance['Meta_Formatada'],
+        textposition='outside',
+        insidetextanchor='end',
+        textfont=dict(size=32, color='#fff', family="Arial, sans-serif")
+    ))
+
+    fig.add_trace(go.Bar(
+        x=df_performance['Vendedor'],
+        y=df_performance['Total_Vendido'],
+        name='Total Vendido',
+        marker_color='skyblue',
+        text=df_performance['Total_Vendido_Formatado'],
+        textposition='inside',
+        insidetextanchor='middle',
+        textfont=dict(size=28, color='#000', family="Arial, sans-serif")
+    ))
+
+    altura_anotacao = max_meta * 0.05 # 5% da maior meta acima
+
+    for index, row in df_performance.iterrows():
+        # Condição para verificar se o vendedor passou da meta
+        if row['Total_Vendido'] > row['Meta']:
+            y_pos_annotation = row['Meta'] + altura_anotacao
+            cor_texto_anotacao = '#ffffff'  # Branco
+        else:
+            y_pos_annotation = row['Total_Vendido'] + (row['Total_Vendido'] * 0.15) # Posição original
+            cor_texto_anotacao = '#000000'  # Preto (original)
+
+        fig.add_annotation(
+            x=row['Vendedor'],
+            y=y_pos_annotation,
+            text=row['Porcentagem_Texto'],
+            showarrow=False,
+            font=dict(size=32, color=cor_texto_anotacao, family="Arial, sans-serif"),
+            align='center',
+            hoverlabel=dict(bgcolor="#fff", font_size=22, font_family="Arial, sans-serif")
+        )
+        
+
+    fig.update_layout(
+        title='Performance de Vendas por Vendedor',
+        xaxis_title='Vendedor',
+        yaxis_title='Valor (R$)',
+        yaxis=dict(tickformat=',.2f'),
+        template='plotly_white',
+        barmode='overlay', # sobrepor as barras
+        showlegend=True,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        height=800,
+        width=500,
+        xaxis=dict(tickfont=dict(size=28)),
+        title_font=dict(size=40, family="Times New Roman"),
+        margin=dict(l=50, r=20, b=100, t=50)
+    )
+    return fig
 
 ##########################################################################################################################################
 
@@ -131,7 +229,7 @@ def renderizar_pagina_vendas(df):
 
     df_filtrado = aplicar_filtros(df, vendedor_selecionado, mes_selecionado_num, ano_selecionado, situacao_selecionada)
   
-    total_nf, total_qtd_produto, valor_total_item, total_custo_compra, total_lucro_venda = calcular_metricas(df_filtrado)
+    total_nf, total_qtd_produto, valor_total_item, total_custo_compra, total_lucro_venda, ticket_medio_geral, porcentagem_lucro_venda = calcular_metricas(df_filtrado)
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Total de Notas", f"{total_nf}")
@@ -148,6 +246,10 @@ def renderizar_pagina_vendas(df):
         if 'Dia' in df.columns:
             fig_vendas_diarias = criar_grafico_vendas_diarias(df_filtrado, mes_numero, ano_selecionado)
             st.plotly_chart(fig_vendas_diarias)
+            df_performance_vendedores = calcular_performance_vendedores(df_filtrado)
+            df_performance_vendedores['Vendedor'] = df_performance_vendedores['Vendedor'].replace('THIAGO SOUSA', 'LICITAÇÃO')
+            fig_performance = criar_grafico_performance_vendedores(df_performance_vendedores)
+            st.plotly_chart(fig_performance)
         else:
             st.warning("A coluna 'Dia' não está presente nos dados. Impossível gerar gráfico de vendas diárias.")
     else:
@@ -183,8 +285,10 @@ def renderizar_pagina_vendas(df):
         
         fig_meses = criar_grafico_meses(df_filtrado)
         st.plotly_chart(fig_meses)
+
     
     
+        
     def ranking_clientes(df, top_n=20):
         """Retorna os top N clientes com maior faturamento total, incluindo o número do ranking."""
         df_clientes = df.groupby('Cliente').agg({'Valor_Total_Item': 'sum'}).reset_index()

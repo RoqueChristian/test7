@@ -1,15 +1,16 @@
+# Seu arquivo principal (ex: meu_app.py)
 import streamlit as st
 import pandas as pd
 from streamlit_option_menu import option_menu
 import os
-import plotly.express as px
 import warnings
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 st.set_page_config(page_title="Go MED SAÚDE", page_icon=":bar_chart:", layout="wide")
 
-from meu_app import * 
+from meu_app import *
+from compras import *
 
 def exibir_cabecalho(img_path, titulo):
     if os.path.exists(img_path):
@@ -28,7 +29,8 @@ st.write("")
 
 def carregar_arquivos(tipo: str):
     caminhos = {
-        "vendas": "df_vendas.csv",
+        "vendas": "arquivos/df_vendas.csv",
+        "compras": "arquivos/df_compra.csv",
     }
     return caminhos.get(tipo, None)
 
@@ -38,8 +40,8 @@ def main():
     with st.sidebar:
         menu_selecionado = option_menu(
             menu_title="Navegação",
-            options=["Análise de Vendas"],
-            icons=["bar-chart-line"],
+            options=["Análise de Vendas", "Análise de Compras"],
+            icons=["bar-chart-line", "bar-chart-line"],
             menu_icon="cast",
             default_index=0,
             styles={
@@ -57,12 +59,11 @@ def main():
 
     if menu_selecionado == "Análise de Vendas":
         caminho_arquivo = carregar_arquivos("vendas")
-
         if caminho_arquivo and os.path.exists(caminho_arquivo):
             try:
                 df = pd.read_csv(caminho_arquivo)
                 if df.empty:
-                    st.warning("O arquivo CSV está vazio.")
+                    st.warning("O arquivo CSV de vendas está vazio.")
                 else:
                     tab1, tab2, tab3 = st.tabs(["Visão Geral", "Comparativo de Períodos", "Analise de tickets"])
 
@@ -76,9 +77,24 @@ def main():
                         renderizar_pagina_vendedor(df)
 
             except Exception as e:
-                st.error(f"Ocorreu um erro ao carregar o arquivo: {e}")
+                st.error(f"Ocorreu um erro ao carregar o arquivo de vendas: {e}")
         else:
-            st.error("Arquivo não encontrado!")
+            st.error("Arquivo de vendas não encontrado!")
+
+    elif menu_selecionado == "Análise de Compras":
+        caminho_arquivo = carregar_arquivos("compras")
+        if caminho_arquivo and os.path.exists(caminho_arquivo):
+            try:
+                df_compras = pd.read_csv(caminho_arquivo)
+                if df_compras.empty:
+                    st.warning("O arquivo CSV de compras está vazio.")
+                else:
+                    renderizar_pagina_compras(df_compras)
+
+            except Exception as e:
+                st.error(f"Ocorreu um erro ao carregar o arquivo de compras: {e}")
+        else:
+            st.error("Arquivo de compras não encontrado!")
 
 if __name__ == "__main__":
     main()
